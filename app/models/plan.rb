@@ -1,7 +1,9 @@
 require 'plan_generation/link_planloves'
+require 'plan_generation/generate_plan'
 
 class Plan < ActiveRecord::Base
   include PlanGeneration::LinkPlanloves
+  include PlanGeneration::GeneratePlan
 
   belongs_to :account, foreign_key: :user_id
   before_save :clean_text
@@ -10,17 +12,6 @@ class Plan < ActiveRecord::Base
   # validates_presence_of :account
   validates_length_of :plan, maximum: 16_777_215, message: 'Your plan is too long'
   validates_length_of :edit_text, maximum: 16_777_215, message: 'Your plan is too long'
-
-  ALLOWED_HTML = {
-      elements: %w[ a b hr i p span pre tt code br ],
-      attributes: {
-        'a' => ['href'],
-        'span' => ['class'],
-      },
-      protocols: {
-        'a' => { 'href' => %w[http https mailto] }
-      },
-    }
 
   # TODO: Consider migrating user_id to userid, like everythig else
   def userid
@@ -32,28 +23,22 @@ class Plan < ActiveRecord::Base
   end
 
   def clean_text
-    renderer = Redcarpet::Render::HTML.new hard_wrap: true, no_images: true
-    markdown = Redcarpet::Markdown.new(
-      renderer,
-      no_intra_emphasis: true,
-      strikethrough: true,
-      lax_html_blocks: true,
-      space_after_headers: true
-    )
-    plan = markdown.render edit_text
+    # Make newlines and other special characters html-friendly, wrap body in <p> tags
+    formatted_plan = process_markdown(edit_text)
 
-    # Convert some legacy elements
-    { u: :underline, strike: :strike, s: :strike }.each do |in_class, out_class|
-      pattern = Regexp.new "<#{in_class}>(.*?)<\/#{in_class}>"
-      replacement = "<span class=\"#{out_class}\">\\1</span>"
-      plan.gsub! pattern, replacement
-    end
+    # Convert legacy elements
+    updated_plan = convert_legacy_tags(formatted_plan)
 
-    # Now sanitize any bad elements
-    plan_html = Sanitize.clean plan, ALLOWED_HTML
+    # Sanitize any bad elements
+    valid_plan = remove_disallowed_tags(updated_plan)
 
-    self.generated_html = link_loves plan_html
+    # Make planloves and other links into <a> tags
+    plan_with_love_links = link_loves(valid_plan)
+    require 'pry'; binding.pry
 
+    # self.update_attributes(plan: plan_with_love_links)
+    self.plan = plan_with_love_links
+    self.save
   end
 
   private
