@@ -1,16 +1,14 @@
 class PagesController < ApplicationController
   layout 'minimal'
-  def index
-  end
 
   def show
-    @page = unsafe_params.fetch(:id, 'index')
-    expanded_page = "#{Rails.root}/app/views/pages/#{@page}.haml"
+    page_name = params[:id]
+    expanded_page = "#{Rails.root}/app/views/pages/#{page_name}.html.haml"
     exists = File.exist?(File.expand_path(expanded_page))
     if exists
-      render action: @page
+      render action: page_name
     else
-      render text: "#{expanded_page} doesn't exist"
+      render text: "#{page_name} doesn't exist."
     end
   end
 end

@@ -41,9 +41,7 @@ Plans::Application.routes.draw do
     end
   end
 
-  resources :pages do
-    get :faq
-  end
+  resources :pages, only: [:show]
 
   resources :password_resets, except: [:destroy, :show, :index]
 
